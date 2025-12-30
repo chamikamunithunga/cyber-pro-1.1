@@ -79,6 +79,10 @@ function App() {
         // Use environment variable for API URL, fallback to localhost for development
         const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5001'
         
+        // Debug logging
+        console.log('🔍 Website - Tracking IP to:', apiBase)
+        console.log('🔍 Website - VITE_API_URL env var:', import.meta.env.VITE_API_URL)
+        
         const response = await axios.post(
           `${apiBase}/api/track-ip`, 
           { 
@@ -112,7 +116,7 @@ function App() {
 
     const updateTimeOnSite = async () => {
       try {
-        const apiBase = 'http://localhost:5001'
+        const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5001'
         const currentTime = Date.now()
         const timeOnSite = Math.floor((currentTime - entryTime) / 1000) // in seconds
         
