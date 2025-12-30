@@ -7,6 +7,7 @@ export default defineConfig({
     outDir: 'dist-admin',
     rollupOptions: {
       input: './admin.html',
+      
     },
   },
   server: {
