@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { saveVisitorData, getAllVisitorData, getRecentVisitorData, getVisitorStats } from './firebase.js';
 
 dotenv.config();
 
@@ -284,15 +285,20 @@ app.post('/api/track-ip', async (req, res) => {
       }
     };
     
-    ipAddresses.push(ipData);
-    
-    console.log('✅ IP tracked:', {
-      ip: ipData.ip,
-      visitCount: ipData.visitCount,
-      location: `${ipData.location.city}, ${ipData.location.country}`,
-      device: `${ipData.deviceInfo.deviceType} - ${ipData.deviceInfo.os}`
-    });
-    console.log('📊 Total IPs stored:', ipAddresses.length);
+    // Save to Firebase
+    try {
+      await saveVisitorData(ipData);
+      console.log('✅ IP tracked and saved to Firebase:', {
+        ip: ipData.ip,
+        visitCount: ipData.visitCount,
+        location: `${ipData.location.city}, ${ipData.location.country}`,
+        device: `${ipData.deviceInfo.deviceType} - ${ipData.deviceInfo.os}`
+      });
+    } catch (firebaseError) {
+      console.error('❌ Error saving to Firebase, using fallback:', firebaseError);
+      // Fallback to in-memory storage if Firebase fails
+      ipAddresses.push(ipData);
+    }
     
     res.json({ success: true, message: 'IP tracked successfully', ip: ip, visitCount: visitCount });
   } catch (error) {
@@ -301,30 +307,79 @@ app.post('/api/track-ip', async (req, res) => {
   }
 });
 
-// Route to get all IP addresses (for admin panel)
-app.get('/api/ips', (req, res) => {
+// Route to get recent IP addresses (last 30 minutes) - default for admin panel
+app.get('/api/ips', async (req, res) => {
   try {
-    console.log('📥 Admin panel requested IPs. Total:', ipAddresses.length);
-    res.json({ success: true, data: ipAddresses });
+    let data;
+    try {
+      // Try Firebase first
+      data = await getRecentVisitorData(30);
+      console.log('📥 Admin panel requested recent IPs (last 30 min). Total:', data.length);
+    } catch (firebaseError) {
+      console.warn('⚠️ Firebase error, using in-memory fallback:', firebaseError);
+      // Fallback to in-memory storage
+      const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
+      data = ipAddresses.filter(item => {
+        const itemTime = new Date(item.timestamp).getTime();
+        return itemTime >= thirtyMinutesAgo;
+      });
+      console.log('📥 Admin panel requested recent IPs (fallback). Total:', data.length);
+    }
+    res.json({ success: true, data: data });
   } catch (error) {
     console.error('❌ Error fetching IPs:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch IPs' });
   }
 });
 
-// Route to get IP statistics
-app.get('/api/ip-stats', (req, res) => {
+// Route to get ALL historical IP addresses (for "Past Data" button)
+app.get('/api/ips/all', async (req, res) => {
   try {
-    const uniqueIPs = new Set(ipAddresses.map(item => item.ip));
-    
-    // Group by IP to get visit counts
-    const ipVisitCounts = {};
-    ipAddresses.forEach(item => {
-      if (!ipVisitCounts[item.ip]) {
-        ipVisitCounts[item.ip] = 0;
-      }
-      ipVisitCounts[item.ip]++;
-    });
+    let data;
+    try {
+      // Try Firebase first
+      data = await getAllVisitorData();
+      console.log('📥 Admin panel requested ALL IPs. Total:', data.length);
+    } catch (firebaseError) {
+      console.warn('⚠️ Firebase error, using in-memory fallback:', firebaseError);
+      // Fallback to in-memory storage
+      data = ipAddresses;
+      console.log('📥 Admin panel requested ALL IPs (fallback). Total:', data.length);
+    }
+    res.json({ success: true, data: data });
+  } catch (error) {
+    console.error('❌ Error fetching all IPs:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch all IPs' });
+  }
+});
+
+// Route to get IP statistics
+app.get('/api/ip-stats', async (req, res) => {
+  try {
+    let stats;
+    try {
+      // Try Firebase first
+      stats = await getVisitorStats();
+    } catch (firebaseError) {
+      console.warn('⚠️ Firebase error, using in-memory fallback:', firebaseError);
+      // Fallback to in-memory storage
+      const uniqueIPs = new Set(ipAddresses.map(item => item.publicIP || item.ip));
+      
+      // Group by IP to get visit counts
+      const ipVisitCounts = {};
+      ipAddresses.forEach(item => {
+        const ip = item.publicIP || item.ip;
+        if (!ipVisitCounts[ip]) {
+          ipVisitCounts[ip] = 0;
+        }
+        ipVisitCounts[ip]++;
+      });
+      
+      stats = {
+        total: ipAddresses.length,
+        unique: uniqueIPs.size
+      };
+    }
     
     const stats = {
       total: ipAddresses.length,
