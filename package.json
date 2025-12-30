@@ -8,7 +8,7 @@
     "dev:admin": "vite --config vite.config.admin.js",
     "build": "vite build",
     "build:website": "vite build --config vite.config.website.js",
-    "build:admin": "vite build --config vite.config.admin.js",
+    "build:admin": "vite build --config vite.config.admin.js && node scripts/post-build-admin.js",
     "preview": "vite preview",
     "preview:website": "vite preview --outDir dist-website",
     "preview:admin": "vite preview --outDir dist-admin --port 3001",
