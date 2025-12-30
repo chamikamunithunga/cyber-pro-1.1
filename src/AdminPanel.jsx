@@ -17,23 +17,51 @@ function AdminPanel() {
       // Use environment variable for API URL, fallback to localhost for development
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5001'
       
+      // Debug logging
+      console.log('🔍 Admin Panel - Fetching data from:', apiBase)
+      console.log('🔍 VITE_API_URL env var:', import.meta.env.VITE_API_URL)
+      
       const [ipsResponse, statsResponse] = await Promise.all([
-        axios.get(`${apiBase}/api/ips`, { timeout: 5000 }),
-        axios.get(`${apiBase}/api/ip-stats`, { timeout: 5000 })
+        axios.get(`${apiBase}/api/ips`, { timeout: 10000 }),
+        axios.get(`${apiBase}/api/ip-stats`, { timeout: 10000 })
       ])
+      
+      console.log('✅ Admin Panel - Received IPs response:', ipsResponse.data)
+      console.log('✅ Admin Panel - Received stats response:', statsResponse.data)
       
       if (ipsResponse.data.success) {
         setIpAddresses(ipsResponse.data.data || [])
+      } else {
+        console.warn('⚠️ IPs response not successful:', ipsResponse.data)
       }
       
       if (statsResponse.data.success) {
         setStats(statsResponse.data.data || { total: 0, unique: 0 })
+      } else {
+        console.warn('⚠️ Stats response not successful:', statsResponse.data)
       }
       
       setLoading(false)
     } catch (error) {
       console.error('❌ Failed to fetch IPs:', error)
-      setError(`Failed to connect to server: ${error.message}. Make sure the backend server is running on port 5001.`)
+      console.error('❌ Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        apiBase: import.meta.env.VITE_API_URL || 'http://localhost:5001'
+      })
+      
+      let errorMessage = `Failed to connect to server: ${error.message}`
+      
+      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+        errorMessage = `Network error: Cannot connect to backend API. Check that VITE_API_URL is set correctly in Vercel environment variables. Current API URL: ${import.meta.env.VITE_API_URL || 'Not set (using localhost fallback)'}`
+      } else if (error.response?.status === 403) {
+        errorMessage = `CORS error (403): Backend server is blocking requests from this domain. Make sure your Vercel domain is allowed in Railway CORS settings.`
+      } else if (error.response?.status === 404) {
+        errorMessage = `API endpoint not found (404). Check that the backend URL is correct: ${import.meta.env.VITE_API_URL || 'Not set'}`
+      }
+      
+      setError(errorMessage)
       setLoading(false)
     }
   }
