@@ -6,12 +6,12 @@ dotenv.config();
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID
+  apiKey: process.env.FIREBASE_API_KEY || "AIzaSyCvlUUGA4itp0mCEbMJmTEmrDW0Kp2l-U4",
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || "cyber-pro-76e01.firebaseapp.com",
+  projectId: process.env.FIREBASE_PROJECT_ID || "cyber-pro-76e01",
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "cyber-pro-76e01.firebasestorage.app",
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "612497371304",
+  appId: process.env.FIREBASE_APP_ID || "1:612497371304:web:df17502f1661975ed6129d"
 };
 
 // Initialize Firebase
