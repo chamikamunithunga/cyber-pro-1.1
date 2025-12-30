@@ -208,6 +208,41 @@
     inset 0 0 20px rgba(255, 165, 0, 0.2);
 }
 
+.btn-past-data {
+  padding: 0.75rem 1.5rem;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid #00ffff;
+  color: #00ffff;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px #00ffff;
+  box-shadow: 
+    0 0 15px rgba(0, 255, 255, 0.4),
+    inset 0 0 15px rgba(0, 255, 255, 0.1);
+}
+
+.btn-past-data:hover {
+  background: rgba(0, 255, 255, 0.1);
+  box-shadow: 
+    0 0 25px rgba(0, 255, 255, 0.6),
+    inset 0 0 25px rgba(0, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.btn-past-data.active {
+  background: rgba(0, 255, 255, 0.2);
+  border-color: #00ffff;
+  color: #00ffff;
+  box-shadow: 
+    0 0 20px rgba(0, 255, 255, 0.6),
+    inset 0 0 20px rgba(0, 255, 255, 0.2);
+}
+
 .admin-content {
   flex: 1;
   padding: 3rem 0;
