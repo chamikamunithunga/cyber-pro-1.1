@@ -9,8 +9,9 @@ function AdminPanel() {
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [error, setError] = useState(null)
   const [selectedIP, setSelectedIP] = useState(null)
+  const [showPastData, setShowPastData] = useState(false) // false = last 30 min, true = all data
 
-  const fetchIPs = async () => {
+  const fetchIPs = async (fetchAll = false) => {
     try {
       setError(null)
       
@@ -19,10 +20,14 @@ function AdminPanel() {
       
       // Debug logging
       console.log('🔍 Admin Panel - Fetching data from:', apiBase)
+      console.log('🔍 Fetch mode:', fetchAll ? 'ALL historical data' : 'Last 30 minutes')
       console.log('🔍 VITE_API_URL env var:', import.meta.env.VITE_API_URL)
       
+      // Use /api/ips/all for all data, /api/ips for last 30 minutes
+      const ipsEndpoint = fetchAll ? '/api/ips/all' : '/api/ips'
+      
       const [ipsResponse, statsResponse] = await Promise.all([
-        axios.get(`${apiBase}/api/ips`, { timeout: 10000 }),
+        axios.get(`${apiBase}${ipsEndpoint}`, { timeout: 10000 }),
         axios.get(`${apiBase}/api/ip-stats`, { timeout: 10000 })
       ])
       
@@ -67,13 +72,20 @@ function AdminPanel() {
   }
 
   useEffect(() => {
-    fetchIPs()
+    fetchIPs(showPastData)
     
     if (autoRefresh) {
-      const interval = setInterval(fetchIPs, 5000) // Refresh every 5 seconds
+      const interval = setInterval(() => fetchIPs(showPastData), 5000) // Refresh every 5 seconds
       return () => clearInterval(interval)
     }
-  }, [autoRefresh])
+  }, [autoRefresh, showPastData])
+  
+  // Handle past data button click
+  const handlePastDataToggle = () => {
+    setShowPastData(!showPastData)
+    setLoading(true)
+    fetchIPs(!showPastData)
+  }
 
   const formatDate = (dateString) => {
     const date = new Date(dateString)
@@ -137,8 +149,17 @@ function AdminPanel() {
             >
               {autoRefresh ? '[PAUSE]' : '[RESUME]'} SCAN
             </button>
-            <button onClick={fetchIPs} className="btn-refresh">
+            <button 
+              onClick={() => fetchIPs(showPastData)} 
+              className="btn-refresh"
+            >
               [REFRESH] DATA
+            </button>
+            <button 
+              onClick={handlePastDataToggle}
+              className={`btn-past-data ${showPastData ? 'active' : ''}`}
+            >
+              {showPastData ? '[CURRENT]' : '[PAST DATA]'}
             </button>
           </div>
         </div>
@@ -165,7 +186,7 @@ function AdminPanel() {
             <div className="stat-card">
               <div className="stat-icon">[ACTIVE]</div>
               <div className="stat-info">
-                <h3>Active Sessions</h3>
+                <h3>{showPastData ? 'All Time Records' : 'Last 30 Minutes'}</h3>
                 <p className="stat-value">{ipAddresses.length}</p>
               </div>
             </div>
