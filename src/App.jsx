@@ -61,7 +61,6 @@ function App() {
       const alreadyTracked = sessionStorage.getItem('ipTracked')
       
       if (alreadyTracked === 'true') {
-        console.log('ℹ️ IP already tracked in this session, skipping...')
         setTracked(true)
         return
       }
