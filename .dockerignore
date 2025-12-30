@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-website
+dist-admin
+.git
+.env
+.env.local
+*.log
+.DS_Store
+
