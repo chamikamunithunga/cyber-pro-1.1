@@ -371,59 +371,77 @@ export const collectDeviceInfo = async () => {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (AudioContext) {
-      info.audioContextSupported = true;
       const audioContext = new AudioContext();
-      const oscillator = audioContext.createOscillator();
-      const analyser = audioContext.createAnalyser();
-      const gainNode = audioContext.createGain();
       
-      // Configure for fingerprinting
-      oscillator.type = 'triangle';
-      oscillator.frequency.value = 10000; // High frequency
-      gainNode.gain.value = 0; // Silent
-      
-      oscillator.connect(analyser);
-      analyser.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      analyser.fftSize = 2048;
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-      
-      oscillator.start();
-      
-      // Get audio processing characteristics
-      setTimeout(() => {
-        analyser.getByteFrequencyData(dataArray);
+      // Check if AudioContext is suspended (requires user gesture)
+      if (audioContext.state === 'suspended') {
+        // Audio fingerprinting requires user interaction, skip it silently
+        info.audioContextSupported = false;
+      } else {
+        info.audioContextSupported = true;
         
-        // Calculate fingerprint from audio processing
-        let sum = 0;
-        let max = 0;
-        let min = 255;
-        for (let i = 0; i < bufferLength; i++) {
-          sum += dataArray[i];
-          if (dataArray[i] > max) max = dataArray[i];
-          if (dataArray[i] < min) min = dataArray[i];
+        try {
+          const oscillator = audioContext.createOscillator();
+          const analyser = audioContext.createAnalyser();
+          const gainNode = audioContext.createGain();
+          
+          // Configure for fingerprinting
+          oscillator.type = 'triangle';
+          oscillator.frequency.value = 10000; // High frequency
+          gainNode.gain.value = 0; // Silent
+          
+          oscillator.connect(analyser);
+          analyser.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          analyser.fftSize = 2048;
+          const bufferLength = analyser.frequencyBinCount;
+          const dataArray = new Uint8Array(bufferLength);
+          
+          oscillator.start();
+          
+          // Get audio processing characteristics
+          setTimeout(() => {
+            try {
+              analyser.getByteFrequencyData(dataArray);
+              
+              // Calculate fingerprint from audio processing
+              let sum = 0;
+              let max = 0;
+              let min = 255;
+              for (let i = 0; i < bufferLength; i++) {
+                sum += dataArray[i];
+                if (dataArray[i] > max) max = dataArray[i];
+                if (dataArray[i] < min) min = dataArray[i];
+              }
+              
+              const avg = sum / bufferLength;
+              const variance = dataArray.reduce((acc, val) => acc + Math.pow(val - avg, 2), 0) / bufferLength;
+              
+              info.audioFingerprint = {
+                average: Math.round(avg * 100) / 100,
+                max: max,
+                min: min,
+                variance: Math.round(variance * 100) / 100,
+                sampleRate: audioContext.sampleRate,
+                fingerprint: `${audioContext.sampleRate}-${Math.round(avg)}-${max}-${min}`
+              };
+              
+              oscillator.stop();
+              audioContext.close();
+            } catch (audioError) {
+              // Silently fail if audio processing fails
+              info.audioContextSupported = false;
+            }
+          }, 100);
+        } catch (audioError) {
+          // Silently fail if audio context can't be used (requires user gesture)
+          info.audioContextSupported = false;
         }
-        
-        const avg = sum / bufferLength;
-        const variance = dataArray.reduce((acc, val) => acc + Math.pow(val - avg, 2), 0) / bufferLength;
-        
-        info.audioFingerprint = {
-          average: Math.round(avg * 100) / 100,
-          max: max,
-          min: min,
-          variance: Math.round(variance * 100) / 100,
-          sampleRate: audioContext.sampleRate,
-          fingerprint: `${audioContext.sampleRate}-${Math.round(avg)}-${max}-${min}`
-        };
-        
-        oscillator.stop();
-        audioContext.close();
-      }, 100);
+      }
     }
   } catch (e) {
-    console.error('Error generating audio fingerprint:', e);
+    // Silently fail - audio fingerprinting is optional
     info.audioContextSupported = false;
   }
 
