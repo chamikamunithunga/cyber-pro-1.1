@@ -130,12 +130,19 @@ export async function getRecentVisitorData(minutes = 30) {
         } catch (indexError) {
           // If index doesn't exist, use simpler query and sort in memory
           console.warn('⚠️ Firestore index missing, using alternative query:', indexError.message);
-          const q = query(
-            collection(db, COLLECTION_NAME),
-            where('createdAt', '>=', timestampAgo)
-          );
-          querySnapshot = await getDocs(q);
-          usedOrderBy = false;
+          try {
+            const q = query(
+              collection(db, COLLECTION_NAME),
+              where('createdAt', '>=', timestampAgo)
+            );
+            querySnapshot = await getDocs(q);
+            usedOrderBy = false;
+          } catch (queryError) {
+            // If even the simple query fails (e.g., no data), return empty array
+            console.warn('⚠️ Firestore query failed, returning empty array:', queryError.message);
+            resolve([]);
+            return;
+          }
         }
         
         const data = [];
