@@ -27,8 +27,8 @@ function AdminPanel() {
       const ipsEndpoint = fetchAll ? '/api/ips/all' : '/api/ips'
       
       const [ipsResponse, statsResponse] = await Promise.all([
-        axios.get(`${apiBase}${ipsEndpoint}`, { timeout: 10000 }),
-        axios.get(`${apiBase}/api/ip-stats`, { timeout: 10000 })
+        axios.get(`${apiBase}${ipsEndpoint}`, { timeout: 30000 }), // 30 seconds for Firebase queries
+        axios.get(`${apiBase}/api/ip-stats`, { timeout: 30000 })
       ])
       
       console.log('✅ Admin Panel - Received IPs response:', ipsResponse.data)
@@ -58,12 +58,16 @@ function AdminPanel() {
       
       let errorMessage = `Failed to connect to server: ${error.message}`
       
-      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        errorMessage = `Request timeout: Backend is taking too long to respond. This might be because Firebase is slow or the server is still starting up. Please wait a moment and refresh.`
+      } else if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
         errorMessage = `Network error: Cannot connect to backend API. Check that VITE_API_URL is set correctly in Vercel environment variables. Current API URL: ${import.meta.env.VITE_API_URL || 'Not set (using localhost fallback)'}`
       } else if (error.response?.status === 403) {
         errorMessage = `CORS error (403): Backend server is blocking requests from this domain. Make sure your Vercel domain is allowed in Railway CORS settings.`
       } else if (error.response?.status === 404) {
         errorMessage = `API endpoint not found (404). Check that the backend URL is correct: ${import.meta.env.VITE_API_URL || 'Not set'}`
+      } else if (error.response?.status === 500) {
+        errorMessage = `Server error (500): Backend encountered an error. Check Railway logs for details. This might be a Firebase connection issue.`
       }
       
       setError(errorMessage)
