@@ -23,6 +23,15 @@ function AdminPanel() {
       console.log('🔍 Fetch mode:', fetchAll ? 'ALL historical data' : 'Last 30 minutes')
       console.log('🔍 VITE_API_URL env var:', import.meta.env.VITE_API_URL)
       
+      // First, test if backend is reachable with health check
+      try {
+        const healthCheck = await axios.get(`${apiBase}/api/health`, { timeout: 5000 })
+        console.log('✅ Backend health check passed:', healthCheck.data)
+      } catch (healthError) {
+        console.error('❌ Backend health check failed:', healthError.message)
+        throw new Error(`Backend server is not responding. The server at ${apiBase} may be down, crashed, or still starting up. Check Railway logs to see if the server is running.`)
+      }
+      
       // Use /api/ips/all for all data, /api/ips for last 30 minutes
       const ipsEndpoint = fetchAll ? '/api/ips/all' : '/api/ips'
       
@@ -58,10 +67,13 @@ function AdminPanel() {
       
       let errorMessage = `Failed to connect to server: ${error.message}`
       
-      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      if (error.message.includes('Backend server is not responding')) {
+        errorMessage = error.message
+      } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
         errorMessage = `Request timeout: Backend is taking too long to respond. This might be because Firebase is slow or the server is still starting up. Please wait a moment and refresh.`
-      } else if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
-        errorMessage = `Network error: Cannot connect to backend API. Check that VITE_API_URL is set correctly in Vercel environment variables. Current API URL: ${import.meta.env.VITE_API_URL || 'Not set (using localhost fallback)'}`
+      } else if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error') || error.code === 'ERR_FAILED') {
+        const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5001'
+        errorMessage = `Network error: Cannot connect to backend API at ${apiBase}. Possible causes: 1) Backend server is not running - Check Railway dashboard to see if the service is online. 2) Server crashed during startup - Check Railway logs for errors. 3) Network connectivity issue - Try refreshing the page. To check: Go to Railway dashboard, open your "perpetual-contentment" service, check the "Logs" tab for error messages, verify the service status shows "Online". Current API URL: ${apiBase}`
       } else if (error.response?.status === 403) {
         errorMessage = `CORS error (403): Backend server is blocking requests from this domain. Make sure your Vercel domain is allowed in Railway CORS settings.`
       } else if (error.response?.status === 404) {
