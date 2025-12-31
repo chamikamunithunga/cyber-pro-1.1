@@ -415,12 +415,22 @@ app.get('/api/ip-stats', async (req, res) => {
       };
     }
     
-    const stats = {
-      total: ipAddresses.length,
-      unique: uniqueIPs.size,
-      recent: ipAddresses.slice(-10).reverse(),
-      visitCounts: ipVisitCounts
-    };
+    // Ensure stats has all required fields
+    if (!stats.recent) {
+      stats.recent = ipAddresses.slice(-10).reverse();
+    }
+    if (!stats.visitCounts) {
+      const ipVisitCounts = {};
+      ipAddresses.forEach(item => {
+        const ip = item.publicIP || item.ip;
+        if (!ipVisitCounts[ip]) {
+          ipVisitCounts[ip] = 0;
+        }
+        ipVisitCounts[ip]++;
+      });
+      stats.visitCounts = ipVisitCounts;
+    }
+    
     res.json({ success: true, data: stats });
   } catch (error) {
     console.error('Error fetching stats:', error);
