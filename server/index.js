@@ -313,7 +313,7 @@ app.get('/api/ips', async (req, res) => {
     let data = [];
     
     // Check if Firebase is initialized before trying
-    if (isFirebaseInitialized && isFirebaseInitialized()) {
+    if (isFirebaseInitialized()) {
       try {
         // Try Firebase first with timeout
         const firebasePromise = getRecentVisitorData(30);
@@ -322,6 +322,10 @@ app.get('/api/ips', async (req, res) => {
         });
         
         data = await Promise.race([firebasePromise, timeoutPromise]);
+        // Ensure data is an array
+        if (!Array.isArray(data)) {
+          data = [];
+        }
         console.log('📥 Admin panel requested recent IPs (last 30 min) from Firebase. Total:', data.length);
       } catch (firebaseError) {
         console.warn('⚠️ Firebase error or timeout, using in-memory fallback:', firebaseError.message);
@@ -344,11 +348,13 @@ app.get('/api/ips', async (req, res) => {
       console.log('📥 Admin panel requested recent IPs (in-memory only). Total:', data.length);
     }
     
-    res.json({ success: true, data: data || [] });
+    // Always return an array, even if empty
+    res.json({ success: true, data: Array.isArray(data) ? data : [] });
   } catch (error) {
     console.error('❌ Error fetching IPs:', error);
     console.error('❌ Error stack:', error.stack);
-    res.status(500).json({ success: false, error: 'Failed to fetch IPs', details: error.message });
+    // Return empty array on error instead of 500
+    res.json({ success: true, data: [] });
   }
 });
 
