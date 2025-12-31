@@ -57,22 +57,37 @@ export async function getAllVisitorData() {
   }
 
   try {
-    const q = query(collection(db, COLLECTION_NAME), orderBy('timestamp', 'desc'));
-    const querySnapshot = await getDocs(q);
-    const data = [];
-    
-    querySnapshot.forEach((doc) => {
-      const docData = doc.data();
-      // Convert Firestore Timestamp to ISO string if needed
-      if (docData.createdAt && docData.createdAt.toDate) {
-        docData.createdAt = docData.createdAt.toDate().toISOString();
+    // Add timeout to Firebase query (25 seconds for all data)
+    const queryPromise = new Promise(async (resolve, reject) => {
+      try {
+        const q = query(collection(db, COLLECTION_NAME), orderBy('timestamp', 'desc'));
+        const querySnapshot = await getDocs(q);
+        const data = [];
+        
+        querySnapshot.forEach((doc) => {
+          const docData = doc.data();
+          // Convert Firestore Timestamp to ISO string if needed
+          if (docData.createdAt && docData.createdAt.toDate) {
+            docData.createdAt = docData.createdAt.toDate().toISOString();
+          }
+          data.push({
+            id: doc.id,
+            ...docData
+          });
+        });
+        
+        resolve(data);
+      } catch (error) {
+        reject(error);
       }
-      data.push({
-        id: doc.id,
-        ...docData
-      });
     });
-    
+
+    // Add 25 second timeout for all data (might be large)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Firebase query timeout')), 25000);
+    });
+
+    const data = await Promise.race([queryPromise, timeoutPromise]);
     console.log('✅ Fetched', data.length, 'visitor records from Firebase');
     return data;
   } catch (error) {
@@ -88,31 +103,46 @@ export async function getRecentVisitorData(minutes = 30) {
   }
 
   try {
-    const now = new Date();
-    const minutesAgo = new Date(now.getTime() - minutes * 60 * 1000);
-    const timestampAgo = Timestamp.fromDate(minutesAgo);
-    
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      where('createdAt', '>=', timestampAgo),
-      orderBy('createdAt', 'desc')
-    );
-    
-    const querySnapshot = await getDocs(q);
-    const data = [];
-    
-    querySnapshot.forEach((doc) => {
-      const docData = doc.data();
-      // Convert Firestore Timestamp to ISO string if needed
-      if (docData.createdAt && docData.createdAt.toDate) {
-        docData.createdAt = docData.createdAt.toDate().toISOString();
+    // Add timeout to Firebase query (20 seconds)
+    const queryPromise = new Promise(async (resolve, reject) => {
+      try {
+        const now = new Date();
+        const minutesAgo = new Date(now.getTime() - minutes * 60 * 1000);
+        const timestampAgo = Timestamp.fromDate(minutesAgo);
+        
+        const q = query(
+          collection(db, COLLECTION_NAME),
+          where('createdAt', '>=', timestampAgo),
+          orderBy('createdAt', 'desc')
+        );
+        
+        const querySnapshot = await getDocs(q);
+        const data = [];
+        
+        querySnapshot.forEach((doc) => {
+          const docData = doc.data();
+          // Convert Firestore Timestamp to ISO string if needed
+          if (docData.createdAt && docData.createdAt.toDate) {
+            docData.createdAt = docData.createdAt.toDate().toISOString();
+          }
+          data.push({
+            id: doc.id,
+            ...docData
+          });
+        });
+        
+        resolve(data);
+      } catch (error) {
+        reject(error);
       }
-      data.push({
-        id: doc.id,
-        ...docData
-      });
     });
-    
+
+    // Add 20 second timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Firebase query timeout')), 20000);
+    });
+
+    const data = await Promise.race([queryPromise, timeoutPromise]);
     console.log('✅ Fetched', data.length, 'recent visitor records (last', minutes, 'minutes) from Firebase');
     return data;
   } catch (error) {
