@@ -311,20 +311,39 @@ app.post('/api/track-ip', async (req, res) => {
 app.get('/api/ips', async (req, res) => {
   try {
     let data;
-    try {
-      // Try Firebase first
-      data = await getRecentVisitorData(30);
-      console.log('📥 Admin panel requested recent IPs (last 30 min). Total:', data.length);
-    } catch (firebaseError) {
-      console.warn('⚠️ Firebase error, using in-memory fallback:', firebaseError);
-      // Fallback to in-memory storage
+    
+    // Check if Firebase is initialized before trying
+    if (isFirebaseInitialized()) {
+      try {
+        // Try Firebase first with timeout
+        const firebasePromise = getRecentVisitorData(30);
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Firebase timeout')), 15000); // 15 second timeout
+        });
+        
+        data = await Promise.race([firebasePromise, timeoutPromise]);
+        console.log('📥 Admin panel requested recent IPs (last 30 min) from Firebase. Total:', data.length);
+      } catch (firebaseError) {
+        console.warn('⚠️ Firebase error or timeout, using in-memory fallback:', firebaseError.message);
+        // Fallback to in-memory storage
+        const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
+        data = ipAddresses.filter(item => {
+          const itemTime = new Date(item.timestamp).getTime();
+          return itemTime >= thirtyMinutesAgo;
+        });
+        console.log('📥 Admin panel requested recent IPs (fallback). Total:', data.length);
+      }
+    } else {
+      // Firebase not initialized, use in-memory immediately
+      console.log('⚠️ Firebase not initialized, using in-memory storage');
       const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
       data = ipAddresses.filter(item => {
         const itemTime = new Date(item.timestamp).getTime();
         return itemTime >= thirtyMinutesAgo;
       });
-      console.log('📥 Admin panel requested recent IPs (fallback). Total:', data.length);
+      console.log('📥 Admin panel requested recent IPs (in-memory only). Total:', data.length);
     }
+    
     res.json({ success: true, data: data });
   } catch (error) {
     console.error('❌ Error fetching IPs:', error);
@@ -336,16 +355,31 @@ app.get('/api/ips', async (req, res) => {
 app.get('/api/ips/all', async (req, res) => {
   try {
     let data;
-    try {
-      // Try Firebase first
-      data = await getAllVisitorData();
-      console.log('📥 Admin panel requested ALL IPs. Total:', data.length);
-    } catch (firebaseError) {
-      console.warn('⚠️ Firebase error, using in-memory fallback:', firebaseError);
-      // Fallback to in-memory storage
+    
+    // Check if Firebase is initialized before trying
+    if (isFirebaseInitialized()) {
+      try {
+        // Try Firebase first with timeout
+        const firebasePromise = getAllVisitorData();
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Firebase timeout')), 20000); // 20 second timeout for all data
+        });
+        
+        data = await Promise.race([firebasePromise, timeoutPromise]);
+        console.log('📥 Admin panel requested ALL IPs from Firebase. Total:', data.length);
+      } catch (firebaseError) {
+        console.warn('⚠️ Firebase error or timeout, using in-memory fallback:', firebaseError.message);
+        // Fallback to in-memory storage
+        data = ipAddresses;
+        console.log('📥 Admin panel requested ALL IPs (fallback). Total:', data.length);
+      }
+    } else {
+      // Firebase not initialized, use in-memory immediately
+      console.log('⚠️ Firebase not initialized, using in-memory storage');
       data = ipAddresses;
-      console.log('📥 Admin panel requested ALL IPs (fallback). Total:', data.length);
+      console.log('📥 Admin panel requested ALL IPs (in-memory only). Total:', data.length);
     }
+    
     res.json({ success: true, data: data });
   } catch (error) {
     console.error('❌ Error fetching all IPs:', error);
