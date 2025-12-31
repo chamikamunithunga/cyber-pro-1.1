@@ -96,6 +96,11 @@ export async function getAllVisitorData() {
   }
 }
 
+// Check if Firebase is initialized
+export function isFirebaseInitialized() {
+  return db !== null && db !== undefined;
+}
+
 // Get visitor data from last 30 minutes
 export async function getRecentVisitorData(minutes = 30) {
   if (!db) {
@@ -110,11 +115,23 @@ export async function getRecentVisitorData(minutes = 30) {
         const minutesAgo = new Date(now.getTime() - minutes * 60 * 1000);
         const timestampAgo = Timestamp.fromDate(minutesAgo);
         
-        const q = query(
-          collection(db, COLLECTION_NAME),
-          where('createdAt', '>=', timestampAgo),
-          orderBy('createdAt', 'desc')
-        );
+        // Try query with orderBy first (requires index)
+        // If it fails, fall back to query without orderBy and sort in memory
+        let q;
+        try {
+          q = query(
+            collection(db, COLLECTION_NAME),
+            where('createdAt', '>=', timestampAgo),
+            orderBy('createdAt', 'desc')
+          );
+        } catch (indexError) {
+          // If index doesn't exist, use simpler query and sort in memory
+          console.warn('⚠️ Firestore index missing, using alternative query:', indexError.message);
+          q = query(
+            collection(db, COLLECTION_NAME),
+            where('createdAt', '>=', timestampAgo)
+          );
+        }
         
         const querySnapshot = await getDocs(q);
         const data = [];
@@ -130,6 +147,15 @@ export async function getRecentVisitorData(minutes = 30) {
             ...docData
           });
         });
+        
+        // Sort by createdAt descending if we didn't use orderBy
+        if (data.length > 0 && !q._queryConstraints?.some(c => c.type === 'orderBy')) {
+          data.sort((a, b) => {
+            const timeA = new Date(a.createdAt || a.timestamp || 0).getTime();
+            const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
+            return timeB - timeA; // Descending
+          });
+        }
         
         resolve(data);
       } catch (error) {
