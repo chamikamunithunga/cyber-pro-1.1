@@ -115,25 +115,29 @@ export async function getRecentVisitorData(minutes = 30) {
         const minutesAgo = new Date(now.getTime() - minutes * 60 * 1000);
         const timestampAgo = Timestamp.fromDate(minutesAgo);
         
+        let querySnapshot;
+        let usedOrderBy = false;
+        
         // Try query with orderBy first (requires index)
-        // If it fails, fall back to query without orderBy and sort in memory
-        let q;
         try {
-          q = query(
+          const q = query(
             collection(db, COLLECTION_NAME),
             where('createdAt', '>=', timestampAgo),
             orderBy('createdAt', 'desc')
           );
+          querySnapshot = await getDocs(q);
+          usedOrderBy = true;
         } catch (indexError) {
           // If index doesn't exist, use simpler query and sort in memory
           console.warn('⚠️ Firestore index missing, using alternative query:', indexError.message);
-          q = query(
+          const q = query(
             collection(db, COLLECTION_NAME),
             where('createdAt', '>=', timestampAgo)
           );
+          querySnapshot = await getDocs(q);
+          usedOrderBy = false;
         }
         
-        const querySnapshot = await getDocs(q);
         const data = [];
         
         querySnapshot.forEach((doc) => {
@@ -149,7 +153,7 @@ export async function getRecentVisitorData(minutes = 30) {
         });
         
         // Sort by createdAt descending if we didn't use orderBy
-        if (data.length > 0 && !q._queryConstraints?.some(c => c.type === 'orderBy')) {
+        if (!usedOrderBy && data.length > 0) {
           data.sort((a, b) => {
             const timeA = new Date(a.createdAt || a.timestamp || 0).getTime();
             const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
