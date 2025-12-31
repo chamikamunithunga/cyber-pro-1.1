@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { saveVisitorData, getAllVisitorData, getRecentVisitorData, getVisitorStats } from './firebase.js';
+import { saveVisitorData, getAllVisitorData, getRecentVisitorData, getVisitorStats, isFirebaseInitialized } from './firebase.js';
 
 dotenv.config();
 
@@ -310,10 +310,10 @@ app.post('/api/track-ip', async (req, res) => {
 // Route to get recent IP addresses (last 30 minutes) - default for admin panel
 app.get('/api/ips', async (req, res) => {
   try {
-    let data;
+    let data = [];
     
     // Check if Firebase is initialized before trying
-    if (isFirebaseInitialized()) {
+    if (isFirebaseInitialized && isFirebaseInitialized()) {
       try {
         // Try Firebase first with timeout
         const firebasePromise = getRecentVisitorData(30);
@@ -344,10 +344,11 @@ app.get('/api/ips', async (req, res) => {
       console.log('📥 Admin panel requested recent IPs (in-memory only). Total:', data.length);
     }
     
-    res.json({ success: true, data: data });
+    res.json({ success: true, data: data || [] });
   } catch (error) {
     console.error('❌ Error fetching IPs:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch IPs' });
+    console.error('❌ Error stack:', error.stack);
+    res.status(500).json({ success: false, error: 'Failed to fetch IPs', details: error.message });
   }
 });
 
