@@ -45,6 +45,7 @@ function AdminPanel() {
       
       if (ipsResponse.data.success) {
         setIpAddresses(ipsResponse.data.data || [])
+        setError(null) // Clear any previous errors on success
       } else {
         console.warn('⚠️ IPs response not successful:', ipsResponse.data)
       }
@@ -90,11 +91,12 @@ function AdminPanel() {
   useEffect(() => {
     fetchIPs(showPastData)
     
-    if (autoRefresh) {
+    // Only auto-refresh if there's no error and autoRefresh is enabled
+    if (autoRefresh && !error) {
       const interval = setInterval(() => fetchIPs(showPastData), 5000) // Refresh every 5 seconds
       return () => clearInterval(interval)
     }
-  }, [autoRefresh, showPastData])
+  }, [autoRefresh, showPastData, error])
   
   // Handle past data button click
   const handlePastDataToggle = () => {
