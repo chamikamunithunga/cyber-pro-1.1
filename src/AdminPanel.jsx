@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import axios from 'axios'
 import './AdminPanel.css'
 
@@ -10,6 +10,7 @@ function AdminPanel() {
   const [error, setError] = useState(null)
   const [selectedIP, setSelectedIP] = useState(null)
   const [showPastData, setShowPastData] = useState(false) // false = last 30 min, true = all data
+  const errorRef = useRef(null) // Use ref to track error without causing re-renders
 
   const fetchIPs = async (fetchAll = false) => {
     try {
@@ -46,6 +47,7 @@ function AdminPanel() {
       if (ipsResponse.data.success) {
         setIpAddresses(ipsResponse.data.data || [])
         setError(null) // Clear any previous errors on success
+        errorRef.current = null // Clear ref
       } else {
         console.warn('⚠️ IPs response not successful:', ipsResponse.data)
       }
@@ -84,19 +86,31 @@ function AdminPanel() {
       }
       
       setError(errorMessage)
+      errorRef.current = errorMessage // Update ref
       setLoading(false)
     }
   }
 
   useEffect(() => {
+    // Initial fetch
     fetchIPs(showPastData)
-    
-    // Only auto-refresh if there's no error and autoRefresh is enabled
-    if (autoRefresh && !error) {
-      const interval = setInterval(() => fetchIPs(showPastData), 5000) // Refresh every 5 seconds
-      return () => clearInterval(interval)
+  }, [showPastData]) // Only refetch when showPastData changes
+
+  // Separate effect for auto-refresh (use ref to avoid loop)
+  useEffect(() => {
+    if (!autoRefresh) {
+      return // Don't set up interval if auto-refresh is off
     }
-  }, [autoRefresh, showPastData, error])
+    
+    const interval = setInterval(() => {
+      // Check error ref (not state) to avoid re-renders
+      if (!errorRef.current) {
+        fetchIPs(showPastData)
+      }
+    }, 5000) // Refresh every 5 seconds
+    
+    return () => clearInterval(interval)
+  }, [autoRefresh, showPastData]) // Don't include error to prevent loop
   
   // Handle past data button click
   const handlePastDataToggle = () => {
